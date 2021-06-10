@@ -1,15 +1,11 @@
 #include <iostream>
 #include <string>
+#include "scheduler.h"
 
 using namespace std;
 
 string PAGE_ALGORITHM = "";
 string PATH = "";
-
-int TOTAL_EVENT_NUM;
-int VM_SIZE;
-int PW_SIZE;
-int PAGE_FRAME_SIZE;
 
 void option_page(string);
 void option_path(string);
@@ -35,19 +31,15 @@ int main(int argc, char *argv[])
         }
     }
 
-    string file_input = PATH == "" ? "input" : PATH + "/input";
-    string file_scheduler = PATH == "" ? "scheduler.txt" : PATH + "/scheduler.txt";
+    Scheduler scheduler;
+    scheduler.getInput(PATH);
+    vector<string> vec = {"0", "program1", "6"};
+    scheduler.createProcess(vec);
+
+    //
     string file_memeory = PATH == "" ? "memory.txt" : PATH + "/memory.txt";
-
-    FILE *input = fopen(file_input.c_str(), "r");
-    FILE *scheduler = fopen(file_scheduler.c_str(), "w");
     FILE *memory = fopen(file_memeory.c_str(), "w");
-
-    char *input_settings = NULL;
-    char *settings2 = NULL;
-    size_t len = 0;
-
-    getline(&input_settings, &len, input);
+    //
 
     return 0;
 }
