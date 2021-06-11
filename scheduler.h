@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 #include <string>
 #include <vector>
 #include <queue>
@@ -14,14 +15,18 @@ struct Process
     int pid;
     string name;
     int priority;
-    int arrival_time;
     int num_codes;
+    bool is_sleeping;
+    int sleep_cycle;
+    int current_code;
     queue<vector<int>> codes;
 };
 
 class Scheduler
 {
 public:
+    bool END = false;
+
     string INPUT_PATH;
     int TOTAL_EVENT_NUM;
     int VM_SIZE;
@@ -29,6 +34,10 @@ public:
     int PAGE_FRAME_SIZE;
 
     int pid_counter = 0;
+    int cycle = 0;
+
+    Process scheduled_process;
+    Process running_process;
 
     queue<vector<string>> input_processes;
     vector<list<Process>> run_queue;
@@ -38,8 +47,18 @@ public:
     void getInput(string);
     vector<string> split(string);
     vector<int> split_int(string);
-    void createProcess(vector<string>);
-    void runCycle();
+
+    void checkSleepTermination();
+    void executeIO(int);
+    void createProcess(string, int);
+    void decideProcess();
+    void executeProcessCode(Process);
+
+    void printSchedulerInfo(Process);
+    void printMemoryInfo(Process);
+
+    void runCycle(int);
+    void start();
 };
 
 vector<string> Scheduler::split(string input)
@@ -103,16 +122,51 @@ void Scheduler::getInput(string path)
     }
 }
 
-void Scheduler::createProcess(vector<string> process_info)
+void Scheduler::checkSleepTermination()
+{
+    for (Process p : sleep_list)
+    {
+        if (p.is_sleeping && p.sleep_cycle == 0)
+        {
+            int num_q = p.priority;
+            p.is_sleeping = false;
+
+            Process temp = p;
+            sleep_list.remove(p);
+            run_queue[num_q].push_back(temp);
+        }
+        else if (p.is_sleeping && p.sleep_cycle > 0)
+        {
+            p.sleep_cycle--;
+        }
+    }
+}
+
+void Scheduler::executeIO(int pid)
+{
+    for (Process p : ioWait_list)
+    {
+        if (pid == p.pid)
+        {
+            int num_q = p.priority;
+            Process temp = p;
+            ioWait_list.remove(p);
+            run_queue[num_q].push_back(temp);
+        }
+    }
+}
+
+void Scheduler::createProcess(string name, int priority)
 {
     Process process;
 
     process.pid = pid_counter;
     pid_counter++;
 
-    process.arrival_time = stoi(process_info[0]);
-    process.name = process_info[1];
-    process.priority = stoi(process_info[2]);
+    process.name = name;
+    process.priority = priority;
+    process.is_sleeping = false;
+    process.current_code = 0;
 
     string code_input = INPUT_PATH + "/" + process.name;
     ifstream input_file(code_input);
@@ -126,9 +180,15 @@ void Scheduler::createProcess(vector<string> process_info)
         getline(input_file, line);
         process.codes.push(split_int(line));
     }
+
+    run_queue[priority].push_back(process);
 }
 
-void Scheduler::runCycle()
+void Scheduler::decideProcess()
+{
+}
+
+void Scheduler::printSchedulerInfo(Process p)
 {
 
     string file_scheduler = INPUT_PATH == "" ? "scheduler.txt" : INPUT_PATH + "/scheduler.txt";
@@ -177,5 +237,58 @@ void Scheduler::runCycle()
             }
 
         fprintf(scheduler_txt, "\n");
+
+        // Line 5
+        fprintf(scheduler_txt, "IOWait List: ");
+        if (ioWait_list.empty())
+            fprintf(scheduler_txt, "Empty");
+        else
+            for (Process p : ioWait_list)
+            {
+                fprintf(scheduler_txt, "%d(%s) ", p.pid, p.name);
+            }
+        fprintf(scheduler_txt, "\n");
+
+        // for the next cycle
+        fprintf(scheduler_txt, "\n");
+    }
+}
+
+void Scheduler::runCycle(int current_cycle)
+{
+    checkSleepTermination();
+
+    bool input_in_current_cycle = true;
+    while (input_in_current_cycle)
+    {
+        vector<string> input = input_processes.front();
+        int input_arrival_time = stoi(input[0]);
+        if (current_cycle == input_arrival_time)
+        {
+            input_processes.pop();
+            char c = input[1][0];
+            c == 'I' ? executeIO(stoi(input[2])) : createProcess(input[1], stoi(input[2]));
+        }
+        else
+        {
+            input_in_current_cycle = false;
+        }
+    }
+
+    decideProcess();
+    executeProcessCode(running_process);
+    printSchedulerInfo(running_process);
+    printMemoryInfo(running_process);
+
+    running_process.current_code++;
+}
+
+void Scheduler::start()
+{
+    while (!END)
+    {
+        runCycle(cycle);
+        cycle++;
+        sleep(3);
     }
 }

@@ -33,8 +33,8 @@ int main(int argc, char *argv[])
 
     Scheduler scheduler;
     scheduler.getInput(PATH);
-    vector<string> vec = {"0", "program1", "6"};
-    scheduler.createProcess(vec);
+    // vector<string> vec = {"0", "program1", "6"};
+    // scheduler.createProcess(vec);
 
     //
     string file_memeory = PATH == "" ? "memory.txt" : PATH + "/memory.txt";
