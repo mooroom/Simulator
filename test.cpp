@@ -22,7 +22,7 @@ int main()
     Process *scheduled_process = nullptr;
     Process *running_process = nullptr;
 
-    Process p1 = {-1};
+    Process p1 = {-1, -5};
 
     Process p2;
     p2.a = 6;
@@ -33,25 +33,18 @@ int main()
     p3.b = 44;
 
     scheduled_process = &p1;
+    Process p4 = *scheduled_process;
 
-    ls.push_back(*scheduled_process);
     ls.push_back(p2);
+    ls.push_back(*scheduled_process);
     ls.push_back(p3);
 
-    // for (Process p : ls)
-    // {
-    //     cout << p.a << " " << p.b << endl;
-    // }
-    // cout << endl;
+    // cout << ls.front().a << endl;
 
-    // ls.remove_if(predicate);
+    p1.a = 20;
+    p4.a = 30;
 
-    // for (Process p : ls)
-    // {
-    //     cout << p.a << " " << p.b << endl;
-    // }
-
-    cout << scheduled_process->b << endl;
+    cout << p1.a << endl;
 
     return 0;
 }

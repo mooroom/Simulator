@@ -24,10 +24,11 @@ struct Process
 };
 
 int execute_io_pid = -1;
+int wake_sleep_pid = -1;
 
 bool predicateSleepDone(Process p)
 {
-    return p.is_sleeping && p.sleep_cycle == 0;
+    return p.pid == wake_sleep_pid;
 }
 bool predicateIoExec(Process p)
 {
@@ -51,11 +52,15 @@ public:
     int pid_counter = 0;
     int cycle = 0;
 
-    // Process *scheduled_process = nullptr;
-    // Process *running_process = nullptr;
-    Process null_process = {-1};
-    Process scheduled_process = null_process;
-    Process running_process = null_process;
+    Process temp;
+    Process *scheduled_process = nullptr;
+    Process *running_process = nullptr;
+
+    queue<Process> print_scheduled_process;
+    queue<Process> print_running_process;
+    // Process null_process = {-1};
+    // Process scheduled_process = null_process;
+    // Process running_process = null_process;
 
     queue<vector<string>> input_processes;
     list<Process> q0, q1, q2, q3, q4, q5, q6, q7, q8, q9;
@@ -90,11 +95,11 @@ vector<string> Scheduler::split(string input)
 {
     vector<string> res;
     stringstream ss(input);
-    string temp;
+    string tmp;
 
-    while (getline(ss, temp, ' '))
+    while (getline(ss, tmp, ' '))
     {
-        res.push_back(temp);
+        res.push_back(tmp);
     }
 
     return res;
@@ -104,11 +109,11 @@ vector<int> Scheduler::split_int(string input)
 {
     vector<int> res;
     stringstream ss(input);
-    string temp;
+    string tmp;
 
-    while (getline(ss, temp, ' '))
+    while (getline(ss, tmp, ' '))
     {
-        res.push_back(stoi(temp));
+        res.push_back(stoi(tmp));
     }
 
     return res;
@@ -156,41 +161,50 @@ void Scheduler::getInput(string path)
 void Scheduler::checkSleepTermination()
 {
     cout << "checkSleepTermination start ok." << endl;
-    for (Process p : sleep_list)
+
+    list<Process>::iterator iter;
+
+    // for (Process p : sleep_list)
+    for (iter = sleep_list.begin(); iter != sleep_list.end(); iter++)
     {
-        if (p.is_sleeping && p.sleep_cycle > 0)
+        if (iter->is_sleeping && iter->sleep_cycle > 0)
         {
-            p.sleep_cycle--;
+            iter->sleep_cycle--;
+            cout << iter->name << " current sleep cycle: " << iter->sleep_cycle << endl;
         }
 
-        if (p.is_sleeping && p.sleep_cycle == 0)
+        if (iter->is_sleeping && iter->sleep_cycle == 0)
         {
-            int num_q = p.priority;
-            p.is_sleeping = false;
-
-            Process temp = p;
-            run_queue[num_q].push_back(temp);
+            int num_q = iter->priority;
+            iter->is_sleeping = false;
+            wake_sleep_pid = iter->pid;
+            cout << "!!!!will go back to run Q!!!" << endl;
+            run_queue[num_q].push_back(*iter);
         }
     }
 
     sleep_list.remove_if(predicateSleepDone);
+    wake_sleep_pid = -1;
 }
 
 void Scheduler::executeIO(int pid)
 {
     cout << "excuteIO start ok." << endl;
     cout << ioWait_list.front().name << endl;
-    for (Process p : ioWait_list)
+
+    list<Process>::iterator iter;
+
+    // for (Process p : ioWait_list)
+    for (iter = ioWait_list.begin(); iter != ioWait_list.end(); iter++)
     {
-        if (pid == p.pid)
+        if (pid == iter->pid)
         {
             cout << "pid is : " << pid << endl;
-            int num_q = p.priority;
-            p.is_io_waiting = false;
+            int num_q = iter->priority;
+            iter->is_io_waiting = false;
 
             execute_io_pid = pid;
-            Process temp = p;
-            run_queue[num_q].push_back(temp);
+            run_queue[num_q].push_back(*iter);
 
             break;
         }
@@ -211,7 +225,7 @@ void Scheduler::createProcess(string name, int priority)
     process.name = name;
     process.priority = priority;
     process.is_sleeping = false;
-    process.current_code = 1;
+    process.current_code = 0;
 
     string code_input = INPUT_PATH + "/" + process.name;
     ifstream input_file(code_input);
@@ -232,25 +246,29 @@ void Scheduler::createProcess(string name, int priority)
 void Scheduler::decideProcess()
 {
     cout << "decideProcess start ok." << endl;
-    if (running_process.pid == -1)
+    if (running_process == nullptr)
     {
         for (int i = 0; i < run_queue.size(); i++)
         {
             if (!run_queue[i].empty())
             {
-                Process temp = run_queue[i].front();
-                // cout << "selected process info: " << temp.pid << endl;
+                cout << ">>>>Q status<<<<" << endl;
+                cout << "Q num: " << i << " " << run_queue[i].front().name << endl;
+                cout << ">>>>--------<<<<" << endl;
+                temp = run_queue[i].front();
+                cout << "selected process info: " << temp.name << endl;
                 run_queue[i].pop_front();
-                scheduled_process = temp;
-                running_process = temp;
+                scheduled_process = &temp;
+                Process p = *scheduled_process;
+                print_scheduled_process.push(p);
                 break;
             }
         }
     }
     else
     {
-        Process temp = running_process;
-        int current_process_priority = temp.priority;
+        Process p = *running_process;
+        int current_process_priority = p.priority;
 
         for (int i = 0; i < run_queue.size(); i++)
         {
@@ -259,11 +277,12 @@ void Scheduler::decideProcess()
 
             if (!run_queue[i].empty())
             {
-                Process preempt_process = run_queue[i].front();
+                temp = run_queue[i].front();
                 run_queue[i].pop_front();
-                run_queue[i].push_back(temp);
-                scheduled_process = preempt_process;
-                running_process = preempt_process;
+                run_queue[i].push_back(p);
+                scheduled_process = &temp;
+                Process p = *scheduled_process;
+                print_scheduled_process.push(p);
                 break;
             }
         }
@@ -273,35 +292,39 @@ void Scheduler::decideProcess()
 void Scheduler::op0_mem_alloc(int arg)
 {
     cout << "op0 start ok." << endl;
+    running_process->current_code++;
 }
 
 void Scheduler::op1_mem_access(int arg)
 {
     cout << "op1 start ok." << endl;
+    running_process->current_code++;
 }
 
 void Scheduler::op2_mem_release(int arg)
 {
     cout << "op2 start ok." << endl;
+    running_process->current_code++;
 }
 
 void Scheduler::op3_non_mem(int arg)
 {
     cout << "op3 start ok." << endl;
+    running_process->current_code++;
 }
 
 void Scheduler::op4_sleep(int arg)
 {
     cout << "op4 start ok." << endl;
-    if (running_process.codes.size() == 1)
+    if (running_process->codes.size() == 1)
         return;
 
-    running_process.is_sleeping = true;
-    running_process.sleep_cycle = arg;
-    running_process.codes.pop();
+    running_process->is_sleeping = true;
+    running_process->sleep_cycle = arg;
+    running_process->codes.pop();
+    running_process->current_code++;
 
-    Process temp = running_process;
-    sleep_list.push_back(temp);
+    sleep_list.push_back(*running_process);
 
     // consider if the process' last operation is sleep op.
 }
@@ -309,14 +332,14 @@ void Scheduler::op4_sleep(int arg)
 void Scheduler::op5_io_wait(int arg)
 {
     cout << "op5 start ok." << endl;
-    if (running_process.codes.size() == 1)
+    if (running_process->codes.size() == 1)
         return;
 
-    running_process.is_io_waiting = true;
-    running_process.codes.pop();
+    running_process->is_io_waiting = true;
+    running_process->codes.pop();
+    running_process->current_code++;
 
-    Process temp = running_process;
-    ioWait_list.push_back(temp);
+    ioWait_list.push_back(*running_process);
 
     // consider if the process' last operation is io op.
 }
@@ -325,24 +348,28 @@ void Scheduler::executeProcessCode()
 {
     cout << "executeProcessCode start ok." << endl;
 
-    int op = running_process.codes.front()[0];
-    int arg = running_process.codes.front()[1];
+    int op = running_process->codes.front()[0];
+    int arg = running_process->codes.front()[1];
 
     // print for check
-    cout << "Process name: " << running_process.name << " operation #" << op << " excuted with argument #" << arg << endl;
+    cout << "Process name: " << running_process->name << " operation #" << op << " excuted with argument #" << arg << endl;
     switch (op)
     {
     case 0:
         op0_mem_alloc(arg);
+        running_process->codes.pop();
         break;
     case 1:
         op1_mem_access(arg);
+        running_process->codes.pop();
         break;
     case 2:
         op2_mem_release(arg);
+        running_process->codes.pop();
         break;
     case 3:
         op3_non_mem(arg);
+        running_process->codes.pop();
         break;
     case 4:
         op4_sleep(arg);
@@ -351,8 +378,6 @@ void Scheduler::executeProcessCode()
         op5_io_wait(arg);
         break;
     }
-
-    running_process.codes.pop();
 }
 
 void Scheduler::printSchedulerInfo()
@@ -361,18 +386,18 @@ void Scheduler::printSchedulerInfo()
 
     // Line 1
     fprintf(scheduler_txt, "[%d Cycle] Scheduled Process: ", cycle);
-    if (scheduled_process.pid != -1)
-        fprintf(scheduler_txt, "%d %s (priority %d)\n", scheduled_process.pid, scheduled_process.name.c_str(), scheduled_process.priority);
+    if (!print_scheduled_process.empty())
+        fprintf(scheduler_txt, "%d %s (priority %d)\n", print_scheduled_process.front().pid, print_scheduled_process.front().name.c_str(), print_scheduled_process.front().priority);
     else
         fprintf(scheduler_txt, "None\n");
-
+    cout << "check0=======" << endl;
     // Line 2
     fprintf(scheduler_txt, "Running Process: ");
-    if (running_process.pid != -1)
-        fprintf(scheduler_txt, "Process#%d(%d) running code %s line %d(op %d arg %d)\n", running_process.pid, running_process.priority, running_process.name.c_str(), running_process.current_code, running_process.codes.front()[0], running_process.codes.front()[1]);
+    if (!print_running_process.empty())
+        fprintf(scheduler_txt, "Process#%d(%d) running code %s line %d(op %d arg %d)\n", print_running_process.front().pid, print_running_process.front().priority, print_running_process.front().name.c_str(), print_running_process.front().current_code + 1, print_running_process.front().codes.front()[0], print_running_process.front().codes.front()[1]);
     else
         fprintf(scheduler_txt, "None\n");
-
+    cout << "check1=======" << endl;
     // Line 3
     for (int i = 0; i < run_queue.size(); i++)
     {
@@ -387,7 +412,7 @@ void Scheduler::printSchedulerInfo()
 
         fprintf(scheduler_txt, "\n");
     }
-
+    cout << "check2=======" << endl;
     // Line 4
     fprintf(scheduler_txt, "SleepList: ");
     if (sleep_list.empty())
@@ -399,7 +424,7 @@ void Scheduler::printSchedulerInfo()
         }
 
     fprintf(scheduler_txt, "\n");
-
+    cout << "check3=======" << endl;
     // Line 5
     fprintf(scheduler_txt, "IOWait List: ");
     if (ioWait_list.empty())
@@ -421,7 +446,7 @@ void Scheduler::runCycle(int current_cycle)
     checkSleepTermination();
 
     bool input_in_current_cycle = true;
-    while (input_in_current_cycle)
+    while (!input_processes.empty() && input_in_current_cycle)
     {
         vector<string> input = input_processes.front();
         int input_arrival_time = stoi(input[0]);
@@ -438,25 +463,53 @@ void Scheduler::runCycle(int current_cycle)
     }
 
     decideProcess();
-    executeProcessCode();
+    if (scheduled_process != nullptr)
+    {
+        cout << "will be scheduled===" << endl;
+        running_process = scheduled_process;
+        scheduled_process = nullptr;
+    }
+
+    if (running_process != nullptr)
+    {
+        Process p = *running_process;
+        print_running_process.push(p);
+        executeProcessCode();
+
+        // when to remove a running process
+        if (running_process->is_sleeping || running_process->is_io_waiting || running_process->codes.empty())
+            running_process = nullptr;
+    }
+
     printSchedulerInfo();
+    if (!print_scheduled_process.empty())
+        print_scheduled_process.pop();
+    if (!print_running_process.empty())
+        print_running_process.pop();
     // printMemoryInfo();
 
-    running_process.current_code++;
-    scheduled_process = null_process;
-
-    // when to remove a running process
-    if (running_process.codes.empty() || running_process.is_sleeping || running_process.is_io_waiting)
-        running_process = null_process;
-
     //  when to terminate scheduler program
-    if (input_processes.empty() && run_queue.empty() && running_process.pid == -1 && scheduled_process.pid == -1 && ioWait_list.empty() && sleep_list.empty())
+    bool run_queues_empty = true;
+    for (list<Process> q : run_queue)
+    {
+        if (!q.empty())
+        {
+            run_queues_empty = false;
+            break;
+        }
+    }
+
+    if (input_processes.empty() && run_queues_empty && running_process == nullptr && scheduled_process == nullptr && ioWait_list.empty() && sleep_list.empty())
+    {
+        cout << "program will be end now..." << endl;
         END = true;
+    }
 }
 
 void Scheduler::start()
 {
     while (!END)
+    // for (int i = 0; i < 34; i++)
     {
         cout << "cycle: " << cycle << endl;
         runCycle(cycle);
