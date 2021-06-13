@@ -164,13 +164,11 @@ void Scheduler::checkSleepTermination()
 
     list<Process>::iterator iter;
 
-    // for (Process p : sleep_list)
     for (iter = sleep_list.begin(); iter != sleep_list.end(); iter++)
     {
         if (iter->is_sleeping && iter->sleep_cycle > 0)
         {
             iter->sleep_cycle--;
-            cout << iter->name << " current sleep cycle: " << iter->sleep_cycle << endl;
         }
 
         if (iter->is_sleeping && iter->sleep_cycle == 0)
@@ -178,7 +176,6 @@ void Scheduler::checkSleepTermination()
             int num_q = iter->priority;
             iter->is_sleeping = false;
             wake_sleep_pid = iter->pid;
-            cout << "!!!!will go back to run Q!!!" << endl;
             run_queue[num_q].push_back(*iter);
         }
     }
@@ -194,12 +191,10 @@ void Scheduler::executeIO(int pid)
 
     list<Process>::iterator iter;
 
-    // for (Process p : ioWait_list)
     for (iter = ioWait_list.begin(); iter != ioWait_list.end(); iter++)
     {
         if (pid == iter->pid)
         {
-            cout << "pid is : " << pid << endl;
             int num_q = iter->priority;
             iter->is_io_waiting = false;
 
@@ -252,11 +247,7 @@ void Scheduler::decideProcess()
         {
             if (!run_queue[i].empty())
             {
-                cout << ">>>>Q status<<<<" << endl;
-                cout << "Q num: " << i << " " << run_queue[i].front().name << endl;
-                cout << ">>>>--------<<<<" << endl;
                 temp = run_queue[i].front();
-                cout << "selected process info: " << temp.name << endl;
                 run_queue[i].pop_front();
                 scheduled_process = &temp;
                 Process p = *scheduled_process;
@@ -352,7 +343,7 @@ void Scheduler::executeProcessCode()
     int arg = running_process->codes.front()[1];
 
     // print for check
-    cout << "Process name: " << running_process->name << " operation #" << op << " excuted with argument #" << arg << endl;
+    // cout << "Process name: " << running_process->name << " operation #" << op << " excuted with argument #" << arg << endl;
     switch (op)
     {
     case 0:
@@ -390,14 +381,14 @@ void Scheduler::printSchedulerInfo()
         fprintf(scheduler_txt, "%d %s (priority %d)\n", print_scheduled_process.front().pid, print_scheduled_process.front().name.c_str(), print_scheduled_process.front().priority);
     else
         fprintf(scheduler_txt, "None\n");
-    cout << "check0=======" << endl;
+
     // Line 2
     fprintf(scheduler_txt, "Running Process: ");
     if (!print_running_process.empty())
-        fprintf(scheduler_txt, "Process#%d(%d) running code %s line %d(op %d arg %d)\n", print_running_process.front().pid, print_running_process.front().priority, print_running_process.front().name.c_str(), print_running_process.front().current_code + 1, print_running_process.front().codes.front()[0], print_running_process.front().codes.front()[1]);
+        fprintf(scheduler_txt, "Process#%d(%d) running code %s line %d(op %d, arg %d)\n", print_running_process.front().pid, print_running_process.front().priority, print_running_process.front().name.c_str(), print_running_process.front().current_code + 1, print_running_process.front().codes.front()[0], print_running_process.front().codes.front()[1]);
     else
         fprintf(scheduler_txt, "None\n");
-    cout << "check1=======" << endl;
+
     // Line 3
     for (int i = 0; i < run_queue.size(); i++)
     {
@@ -412,7 +403,7 @@ void Scheduler::printSchedulerInfo()
 
         fprintf(scheduler_txt, "\n");
     }
-    cout << "check2=======" << endl;
+
     // Line 4
     fprintf(scheduler_txt, "SleepList: ");
     if (sleep_list.empty())
@@ -424,7 +415,7 @@ void Scheduler::printSchedulerInfo()
         }
 
     fprintf(scheduler_txt, "\n");
-    cout << "check3=======" << endl;
+
     // Line 5
     fprintf(scheduler_txt, "IOWait List: ");
     if (ioWait_list.empty())
@@ -465,7 +456,6 @@ void Scheduler::runCycle(int current_cycle)
     decideProcess();
     if (scheduled_process != nullptr)
     {
-        cout << "will be scheduled===" << endl;
         running_process = scheduled_process;
         scheduled_process = nullptr;
     }
